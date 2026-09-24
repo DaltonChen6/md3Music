@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-labelledby="title desc">
   <title id="title">MD3Music 最近 90 天 GitHub Star 趋势</title>
-  <desc id="desc">截至 2026-09-24，当前 618 Stars，90 天首尾变化 +0。</desc>
+  <desc id="desc">截至 2026-09-24，当前 620 Stars，90 天首尾变化 +0。</desc>
   <a href="https://github.com/zzyoxml/md3Music">
     <rect width="960" height="360" rx="18" fill="#f7faff"/>
     <text x="72" y="30" fill="#172b4d" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="20" font-weight="700">MD3Music · GitHub Star 趋势</text>
-    <text x="932" y="30" text-anchor="end" fill="#526581" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14">最近 90 天 · 618 Stars</text>
-    <g fill="none" stroke-width="1"><line x1="72" y1="290.0" x2="932" y2="290.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="294.0" text-anchor="end">613</text><line x1="72" y1="242.4" x2="932" y2="242.4" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="246.4" text-anchor="end">616</text><line x1="72" y1="171.0" x2="932" y2="171.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="175.0" text-anchor="end">618</text><line x1="72" y1="123.4" x2="932" y2="123.4" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="127.4" text-anchor="end">620</text><line x1="72" y1="52.0" x2="932" y2="52.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="56.0" text-anchor="end">623</text></g>
+    <text x="932" y="30" text-anchor="end" fill="#526581" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14">最近 90 天 · 620 Stars</text>
+    <g fill="none" stroke-width="1"><line x1="72" y1="290.0" x2="932" y2="290.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="294.0" text-anchor="end">615</text><line x1="72" y1="242.4" x2="932" y2="242.4" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="246.4" text-anchor="end">618</text><line x1="72" y1="171.0" x2="932" y2="171.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="175.0" text-anchor="end">620</text><line x1="72" y1="123.4" x2="932" y2="123.4" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="127.4" text-anchor="end">622</text><line x1="72" y1="52.0" x2="932" y2="52.0" stroke="#d9e2f0" stroke-dasharray="4 6"/><text x="60" y="56.0" text-anchor="end">625</text></g>
     <polygon points="72.0,290.0 72.0,171.0 72.0,290.0" fill="#2f80ed" fill-opacity=".12"/>
     <polyline points="72.0,171.0" fill="none" stroke="#1769e0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="72.0" cy="171.0" r="5" fill="#1769e0"/>
