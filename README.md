@@ -131,7 +131,7 @@ MD3Music 是一款基于酷狗音乐 API 的 Flutter 音乐播放器，内置嵌
 ### Flyme 状态栏歌词
 
 <p align="center">
-  <img src="img/phone/flyme/lyric.png" width="260" alt="状态栏歌词实际效果" />
+  <img src="img/phone/flyme/lyric.gif" width="260" alt="状态栏歌词实际效果" />
   <img src="img/phone/flyme/settings.png" width="260" alt="状态栏歌词设置" />
 </p>
 
