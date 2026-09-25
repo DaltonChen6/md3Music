@@ -141,6 +141,10 @@ class DesktopLyricService {
   int _flymeLineIndex = -1;
   Timer? _flymeLineTimer;
   DateTime? _flymeLastSwitchAt;
+
+  /// 上一次观测到的播放位置（ms），-1 表示尚未采样。
+  /// 只用来判定"位置真的往回走了"，见 [_tickFlymeAdvance]。
+  int _flymePrevPosMs = -1;
   // 共用偏好（设置页三种推送协议共用一份）：
   // - 翻译歌词开关：是否推送翻译（影响 SuperLyric 与 LyricInfo）
   bool _pushTranslation = true;
@@ -458,6 +462,7 @@ class DesktopLyricService {
       // 要等到下一次翻行才看得出提前效果。索引先归零，避免被去重吞掉。
       _flymeLineIndex = -1;
       _flymeLastSwitchAt = null;
+      _flymePrevPosMs = -1;
       final p = _player;
       if (p != null && _lines.isNotEmpty) {
         _tickFlymeAdvance(p.position.inMilliseconds);
@@ -469,6 +474,7 @@ class DesktopLyricService {
       _cancelFlymeLineTimer();
       _flymeLineIndex = -1;
       _flymeLastSwitchAt = null;
+      _flymePrevPosMs = -1;
     }
     _notify();
   }
@@ -748,18 +754,32 @@ class DesktopLyricService {
     final player = _player;
     if (player == null || _lines.isEmpty) return;
     _flymeLastSwitchAt = null; // 手动调档视为用户意图，不该被迟滞挡住
+    // 索引也要归零：调小提前量会让目标行倒退，而正常翻行是禁止倒退的（见
+    // _tickFlymeAdvance），不归零就会卡在调整前的那一句。
+    _flymeLineIndex = -1;
     _tickFlymeAdvance(player.position.inMilliseconds);
   }
 
   /// 用「位置 + 提前量」选行并推送。独立于共享的 `_currentLineIndex` 提交路径，
   /// 所以其它歌词通道仍严格按原始时间轴走。
+  ///
+  /// 只允许索引前进：状态栏是一条只往未来走的时间轴，而真机日志实测位置源抖动
+  /// 会让行号在相邻两行间来回跳。原来只有 300ms 迟滞，它只是把回跳推迟、隔几百
+  /// 毫秒放行一次，结果是"刚换到下一句又翻回上一句"——用户看到的正是同一句反复
+  /// 滚动。改成禁止倒退后抖动被彻底挡住；位置真实回退（拖进度条/重播）仍要跟上，
+  /// 故以「比上一次采样早 1.5s 以上」作为真回退的判据（抖动幅度远小于一个行间隔）。
   void _tickFlymeAdvance(int posMs) {
     final idx = _findLineIndex(posMs + _flymeAdvanceMs);
+    final rewound = _flymePrevPosMs - posMs > 1500;
+    _flymePrevPosMs = posMs;
     if (idx == _flymeLineIndex) return;
-    // 位置源抖动会让行号在相邻两行间来回跳；这一路自己也要迟滞，
-    // 否则提前量越大、越靠近行首，越容易反复 notify() 撞上系统限流。
+    if (idx < _flymeLineIndex && !rewound) return;
+    // 前进要迟滞：一次抖动可能连跨两行，或换行恰好撞上 notify 限流窗口。
+    // 真回退例外：它同时绕过后面的索引判定，若此处再被吞掉，_flymePrevPosMs
+    // 已经是回退后的位置，之后再也判不出回退，状态栏会钉在后面那句直到播放追平。
     final now = DateTime.now();
-    if (_flymeLastSwitchAt != null &&
+    if (!rewound &&
+        _flymeLastSwitchAt != null &&
         now.difference(_flymeLastSwitchAt!).inMilliseconds < 300) {
       return;
     }
@@ -948,6 +968,7 @@ class DesktopLyricService {
       _currentLineIndex = -1;
       _flymeLineIndex = -1;
       _flymeLastSwitchAt = null;
+      _flymePrevPosMs = -1;
       _cancelLineTimer();
       _cancelFlymeLineTimer();
       // 锁屏歌词：清空界面，避免残留上一首歌词
@@ -984,6 +1005,7 @@ class DesktopLyricService {
       }
       _flymeLineIndex = -1;
       _flymeLastSwitchAt = null;
+      _flymePrevPosMs = -1;
       // LyricInfo：切歌时立即移除上一首的 lyricInfo，避免旧歌词短暂匹配到新歌
       if (_lyricInfoEnabled) {
         _lyricInfoPushed = false;

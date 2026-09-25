@@ -113,6 +113,13 @@ object FlymeLyricBridge {
      * 是最新的，永不自愈。
      */
     fun attach(context: Context, notificationId: Int, notification: Notification) {
+        // 诊断用：Media3 在播放态/timeline/元数据/自定义按钮变化时都会重建并重发通知，
+        // 每次都会走到这里。若同一句歌词在此期间被重新 post，Flyme 会把 marquee 从头
+        // 再滚一遍 —— 表现即"字没变却又滚了一次"。真机用 `adb logcat -s FlymeStatusBarLyric`
+        // 数这条的次数，即可与 Dart 侧的重推区分开。只记录，不拦截。
+        if (enabled && currentLyric.isNotEmpty()) {
+            Log.d(TAG, "媒体通知被重建，歌词未变仍会重贴 ticker=[$currentLyric]")
+        }
         appContext = context.applicationContext
         // 换绑新对象/新 id 时重置确认位：否则上一首残留的 true 会让新歌在
         // "尚未 post"的窗口里被误判为"已被撤下"，进而清空缓存导致歌词出不来
