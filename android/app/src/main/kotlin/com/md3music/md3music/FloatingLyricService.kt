@@ -94,6 +94,20 @@ class FloatingLyricService : Service() {
         const val NOTIFICATION_ID = 1003
         private const val PREFS_NAME = "floating_lyric"
         private const val KEY_Y_PX = "y_px"
+        // 对齐酷狗概念版悬浮窗的两态 flags（deskwidget.c.E0/q1）。
+        // 解锁态 = NOT_FOCUSABLE|NOT_TOUCH_MODAL|WATCH_OUTSIDE_TOUCH = 262184 (0x40028)：
+        // 加入 WATCH_OUTSIDE_TOUCH 后，点击歌词条以外区域系统会派发 ACTION_OUTSIDE，
+        // 据此自动收起展开的控制栏（酷狗的标志性交互）。
+        private const val FLAGS_UNLOCKED =
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+        // 锁定态 = NOT_FOCUSABLE|NOT_TOUCHABLE|NOT_TOUCH_MODAL = 56 (0x38)：
+        // 整窗彻底触控穿透，所有手势 100% 落到下层 App，且不再收 ACTION_OUTSIDE。
+        private const val FLAGS_LOCKED =
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
         // 阶段8：桌面歌词运行标志。开启期间本服务常驻 FGS（1003 可见通知）撑住
         // 进程前台，AudioPlaybackService 据此让位（不再显示保活空通知 1002）。
         @Volatile
@@ -291,6 +305,20 @@ class FloatingLyricService : Service() {
     private fun hasOverlayPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
 
+    /// 窗口类型三级分流，对齐酷狗 deskwidget.d.a()（OSType.c()? (SDK>=26?2038:2003) : 2005）。
+    /// 酷狗靠 OSType.c() 判定"主流可识别 ROM"，现代设备恒为 true，故实际运行行为即按 SDK 分层：
+    /// - 8.0+：TYPE_APPLICATION_OVERLAY(2038) —— Google 弃用旧系统类型后的唯一正解
+    /// - 6.0~7.1：TYPE_SYSTEM_ALERT(2003)
+    /// - 更旧：TYPE_TOAST(2005) —— 早期免 SYSTEM_ALERT_WINDOW 的历史方案（现代机走不到）
+    private fun overlayWindowType(): Int = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+        else ->
+            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_TOAST
+    }
+
     private fun setLocked(value: Boolean) {
         if (locked == value) return
         locked = value
@@ -310,22 +338,18 @@ class FloatingLyricService : Service() {
         val root = rootView ?: return
 
         if (locked) {
-            // Collapse expanded panel when locking
+            // Collapse expanded panel + settings when locking
             expanded = false
             expandedPanel?.visibility = View.GONE
-
-            // Add FLAG_NOT_TOUCHABLE for click-through
-            p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            try {
-                wm.updateViewLayout(root, p)
-            } catch (_: Exception) {}
+            settingsPanel?.visibility = View.GONE
+            // 整窗切到锁定态 flags（含 FLAG_NOT_TOUCHABLE，彻底触控穿透）
+            p.flags = FLAGS_LOCKED
         } else {
-            // Remove FLAG_NOT_TOUCHABLE
-            p.flags = p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            try {
-                wm.updateViewLayout(root, p)
-            } catch (_: Exception) {}
+            p.flags = FLAGS_UNLOCKED
         }
+        try {
+            wm.updateViewLayout(root, p)
+        } catch (_: Exception) {}
     }
 
     // 实际下发给 TextView 的字号：基准字号 × 「显示大小」档位。
@@ -556,19 +580,13 @@ class FloatingLyricService : Service() {
 
         setupTouchListener(root)
 
-        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        } else {
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_PHONE
-        }
+        val layoutType = overlayWindowType()
 
         params = WindowManager.LayoutParams(
             fixedWindowWidth,
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            if (locked) FLAGS_LOCKED else FLAGS_UNLOCKED,
             PixelFormat.TRANSLUCENT
         ).apply {
             // Centered horizontally, vertical position adjustable
@@ -889,6 +907,15 @@ class FloatingLyricService : Service() {
             if (locked) return@setOnTouchListener false
 
             when (event.action) {
+                MotionEvent.ACTION_OUTSIDE -> {
+                    // FLAG_WATCH_OUTSIDE_TOUCH：点击歌词条以外区域 → 收起展开的控制栏/设置面板
+                    if (expanded) {
+                        expanded = false
+                        expandedPanel?.visibility = View.GONE
+                        settingsPanel?.visibility = View.GONE
+                    }
+                    false
+                }
                 MotionEvent.ACTION_DOWN -> {
                     initialY = params?.y ?: 0
                     initialTouchY = event.rawY
