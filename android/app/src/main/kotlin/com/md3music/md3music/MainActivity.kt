@@ -240,6 +240,64 @@ class MainActivity : FlutterActivity() {
         return super.provideFlutterEngine(context)
     }
 
+    /// 跳转悬浮窗授权页：优先国产 ROM 专有安全中心（对齐酷狗 AlertWindowSettingPage.start），
+    /// 解析失败/抛异常时回退标准 ACTION_MANAGE_OVERLAY_PERMISSION，再兜底应用详情页。
+    private fun openOverlayPermissionSettings() {
+        val vendor = vendorOverlayIntent()
+        if (vendor != null) {
+            try {
+                startActivity(vendor)
+                return
+            } catch (_: Exception) {}
+        }
+        try {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            )
+        } catch (_: Exception) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    /// 按厂商构造悬浮窗管理页 Intent；不可解析（组件不存在/未装安全中心）时返回 null。
+    private fun vendorOverlayIntent(): Intent? {
+        val key = (Build.MANUFACTURER + " " + Build.BRAND).lowercase()
+        val intent = when {
+            key.contains("huawei") || key.contains("honor") ->
+                componentIntent("com.huawei.systemmanager", "com.huawei.systemmanager.addviewmonitor.AddViewMonitorActivity")
+                    ?: componentIntent("com.huawei.systemmanager", "com.huawei.permissionmanager.ui.MainActivity")
+            key.contains("xiaomi") || key.contains("redmi") || key.contains("poco") ->
+                Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                    setClassName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.permissions.PermissionsEditorActivity"
+                    )
+                    putExtra("extra_pkgname", packageName)
+                }
+            key.contains("oppo") || key.contains("oneplus") || key.contains("realme") ->
+                componentIntent("com.coloros.safecenter", "com.coloros.safecenter.sysfloatwindow.FloatWindowListActivity")
+                    ?: componentIntent("com.oppo.safe", "com.oppo.safe.permission.floatwindow.FloatWindowListActivity")
+            key.contains("vivo") || key.contains("iqoo") ->
+                componentIntent("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.FloatWindowManager")
+                    ?: componentIntent("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.SoftPermissionDetailActivity")
+            key.contains("meizu") ->
+                Intent("com.meizu.safe.security.SHOW_APPSEC").apply {
+                    setClassName("com.meizu.safe", "com.meizu.safe.security.AppSecActivity")
+                    putExtra("packageName", packageName)
+                }
+            else -> null
+        } ?: return null
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return if (packageManager.resolveActivity(intent, 0) != null) intent else null
+    }
+
+    private fun componentIntent(pkg: String, cls: String): Intent? =
+        Intent().apply { component = android.content.ComponentName(pkg, cls) }
+
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -341,8 +399,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "startFloatingLyric" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-                        startActivity(intent)
+                        openOverlayPermissionSettings()
                         result.error("PERMISSION_DENIED", "需要悬浮窗权限", null)
                     } else {
                         // 服务已在运行且悬浮窗已成功添加：直接成功（避免重复拉起服务）
@@ -600,11 +657,7 @@ class MainActivity : FlutterActivity() {
                     if (Build.VERSION.SDK_INT < 29) {
                         result.error("UNSUPPORTED", "仅支持 Android 10 及以上", null)
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:$packageName")
-                        )
-                        startActivity(intent)
+                        openOverlayPermissionSettings()
                         result.error("PERMISSION_DENIED", "需要悬浮窗权限", null)
                     } else {
                         val intent = Intent(this, FloatingRecognitionService::class.java)
